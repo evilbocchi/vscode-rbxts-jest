@@ -1,71 +1,86 @@
-# vscode-rbxts-jest README
+<div style="text-align: center;">
+    <img src="./branding/logo.png/" width="128" height="128"/>
+</div>
 
-This is the README for your extension "vscode-rbxts-jest". After writing up a brief description, we recommend including the following sections.
+# rbxts-jest VS Code Extension
 
-## Features
+Run your [roblox-ts](https://roblox-ts.com/) Jest tests directly from the VS Code Testing sidebar. This extension watches your TypeScript spec files, discovers the `describe`/`it` tree, and executes the suite through your project-provided `npm test` script so results flow back into the editor.
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
-
-For example if there is an image subfolder under your extension project workspace:
-
-\!\[feature X\]\(images/feature-x.png\)
-
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+## Highlights
+- **Automatic discovery** of `*.spec.ts` files and nested `describe` / `it` blocks.
+- **Testing sidebar integration** with run, debug, and rerun actions powered by the VS Code Testing API.
+- **On-demand commands** to refresh test metadata or execute the whole suite.
+- **Selective execution** by forwarding VS Code's selection filter to Jest via `JEST_TEST_NAME_PATTERN`.
+- **Roblox Cloud ready**: ships with a sample runner that forwards results from Roblox Cloud Luau execution.
 
 ## Requirements
+- VS Code 1.106.0 or newer.
+- Node.js 18+ (needed for the extension host and the demo project scripts).
+- A workspace with an `npm test` script that ultimately runs your Jest-Luau tests. The included demo uses Roblox Cloud APIs, which require:
+  - `LUAU_EXECUTION_KEY`
+  - `LUAU_EXECUTION_UNIVERSE_ID`
+  - `LUAU_EXECUTION_PLACE_ID`
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+> **Tip:** The extension looks for a `package.json` with a `test` script in the workspace root, in the configured `demoPath`, or one directory above the workspace. Make sure one of those locations exposes an appropriate runner.
 
-## Extension Settings
+## Getting Started
+1. Install the extension (from the Marketplace or by running `npm install && npm run compile` and using VS Code's `Install from VSIX...`).
+2. Open a roblox-ts project that includes Jest specs (default glob: `**/__tests__/**/*.spec.ts` and `**/*.spec.ts`).
+3. Ensure your `npm test` script builds any required assets and returns a zero exit code on success.
+4. Open the **Testing** view (`Ctrl+Shift+`\``) to see the discovered test tree.
+5. Run or debug individual tests, suites, or the full workspace using the inline buttons or commands below.
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+## Commands
+- `rbxts-jest: Refresh Tests` (command id: `vscode-rbxts-jest.refreshTests`)
+  - Rebuilds the test tree. Runs automatically on activation and when files change.
+- `rbxts-jest: Run All Tests` (command id: `vscode-rbxts-jest.runAllTests`)
+  - Invokes VS Code's `testing.runAll` for the rbxts-jest controller.
 
-For example:
+You can access these commands from the Command Palette (`Ctrl+Shift+P`) or map them to custom keybindings.
 
-This extension contributes the following settings:
+## Configuration
+`rbxts-jest` contributes settings under `Settings → Extensions → rbxts-jest`:
 
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
+| Setting                | Default                                         | Description                                                                                                           |
+| ---------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `rbxts-jest.testMatch` | `["**/__tests__/**/*.spec.ts", "**/*.spec.ts"]` | Glob patterns used during discovery.                                                                                  |
+| `rbxts-jest.demoPath`  | `"demo"`                                        | Fallback location inspected for a `package.json` with a `test` script. Update if you keep the bundled demo elsewhere. |
 
-## Known Issues
+## How Test Execution Works
+1. **Discovery**: `TestParser` scans each matching spec file to build a nested tree of `describe` and `it` nodes.
+2. **Run request**: Starting a run collects all selected leaf nodes (individual tests) and their parents.
+3. **Filtering**: If you triggered a subset of tests, the extension builds a `JEST_TEST_NAME_PATTERN` regex from their full names. Your `npm test` script can read this env var to filter execution.
+4. **Execution**: `npm test` is executed from the first folder that exposes the script (workspace root, `demoPath`, or parent). The bundled demo compiles the project, republishes the `place.rbxl`, and calls Roblox Cloud Luau to execute `src/runTests.ts`.
+5. **Result parsing**: Standard Jest glyphs (`✓`, `✕`, `●`, etc.) in stdout/stderr are mapped back to VS Code test results so passes, failures, and messages appear inline.
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+If the command cannot start, every pending test is marked as errored with the surfaced message to help diagnose missing tools or environment variables.
 
-## Release Notes
+## Using the Included Demo Project
+The `demo/` folder contains a roblox-ts sample with Jest tests plus a Roblox Cloud runner:
 
-Users appreciate release notes as you update your extension.
+```text
+npm run build  # compiles TypeScript and rebuilds place.rbxl via rojo
+npm test       # builds and invokes demo/runTests.js
+```
 
-### 1.0.0
+`demo/runTests.js` deploys `demo/place.rbxl` to the Roblox Cloud experience specified by the environment variables and then runs `src/runTests.ts`. This file requires `@rbxts/jest` and exposes any failures through stdout, which the extension parses. Adapt this structure for your own experience by editing `demo/runTests.ts` or pointing `rbxts-jest.demoPath` at your project.
 
-Initial release of ...
+## Development
+Interested in hacking on the extension itself?
 
-### 1.0.1
+```shell
+npm install
+npm run watch   # incremental build
+```
 
-Fixed issue #.
+- Launch the **Extension Development Host** from VS Code (`F5`) to test changes.
+- Run `npm test` to execute the extension's integration tests via `@vscode/test-electron`.
+- Before publishing, build with `npm run compile` and verify `out/` contains the transpiled scripts.
 
-### 1.1.0
+## Troubleshooting
+- **No tests appear**: confirm your spec files match `rbxts-jest.testMatch` and contain `describe`/`it`. Use the refresh command after adjusting patterns.
+- **Runs fail immediately**: ensure the extension can find a folder with an `npm test` script and that the script exits with code `0` on success.
+- **Roblox Cloud errors**: double-check the environment variables and permissions. View the Testing output channel for the full log replayed by the extension.
 
-Added features X, Y, and Z.
-
----
-
-## Following extension guidelines
-
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
-
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+## License
+MIT
