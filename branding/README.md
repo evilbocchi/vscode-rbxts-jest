@@ -1,0 +1,1 @@
+Branding assets from https://github.com/jsdotlua/jest-lua.

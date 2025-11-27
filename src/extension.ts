@@ -1,26 +1,37 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
+import { RbxtsJestTestController } from './testController';
 
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
+let testController: RbxtsJestTestController | undefined;
+
 export function activate(context: vscode.ExtensionContext) {
+	console.log('rbxts-jest extension is now active!');
 
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
-	console.log('Congratulations, your extension "vscode-rbxts-jest" is now active!');
+	// Create the test controller
+	testController = new RbxtsJestTestController(context);
 
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with registerCommand
-	// The commandId parameter must match the command field in package.json
-	const disposable = vscode.commands.registerCommand('vscode-rbxts-jest.helloWorld', () => {
-		// The code you place here will be executed every time your command is executed
-		// Display a message box to the user
-		vscode.window.showInformationMessage('Hello World from vscode-rbxts-jest!');
+	// Register the refresh command
+	const refreshCommand = vscode.commands.registerCommand('vscode-rbxts-jest.refreshTests', async () => {
+		if (testController) {
+			await testController.discoverAllTests();
+			vscode.window.showInformationMessage('Tests refreshed!');
+		}
 	});
 
-	context.subscriptions.push(disposable);
+	// Register the run all tests command
+	const runAllCommand = vscode.commands.registerCommand('vscode-rbxts-jest.runAllTests', async () => {
+		// This will trigger running all tests through the test explorer
+		await vscode.commands.executeCommand('testing.runAll');
+	});
+
+	context.subscriptions.push(refreshCommand, runAllCommand);
+
+	// Initial test discovery
+	testController.discoverAllTests();
 }
 
-// This method is called when your extension is deactivated
-export function deactivate() {}
+export function deactivate() {
+	if (testController) {
+		testController.dispose();
+		testController = undefined;
+	}
+}

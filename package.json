@@ -7,17 +7,44 @@
         "vscode": "^1.106.0"
     },
     "categories": [
-        "Other"
+        "Testing"
     ],
-    "activationEvents": [],
+    "activationEvents": [
+        "workspaceContains:**/*.spec.ts",
+        "onStartupFinished"
+    ],
     "main": "./out/extension.js",
     "contributes": {
         "commands": [
             {
-                "command": "vscode-rbxts-jest.helloWorld",
-                "title": "Hello World"
+                "command": "vscode-rbxts-jest.refreshTests",
+                "title": "Refresh Tests",
+                "category": "rbxts-jest"
+            },
+            {
+                "command": "vscode-rbxts-jest.runAllTests",
+                "title": "Run All Tests",
+                "category": "rbxts-jest"
             }
-        ]
+        ],
+        "configuration": {
+            "title": "rbxts-jest",
+            "properties": {
+                "rbxts-jest.testMatch": {
+                    "type": "array",
+                    "default": [
+                        "**/__tests__/**/*.spec.ts",
+                        "**/*.spec.ts"
+                    ],
+                    "description": "Glob patterns to match test files"
+                },
+                "rbxts-jest.demoPath": {
+                    "type": "string",
+                    "default": "demo",
+                    "description": "Path to the demo folder containing the test runner"
+                }
+            }
+        }
     },
     "scripts": {
         "vscode:prepublish": "npm run compile",

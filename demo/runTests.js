@@ -6,10 +6,7 @@ import { runCloudLuau } from "./cloudLuauRunner.js";
 
 dotenv.config({ quiet: true });
 
-const SCRIPT_PATH = path.join(import.meta.dirname, "test", "spec.server.luau");
 const PLACE_FILE_PATH = path.join(import.meta.dirname, "place.rbxl");
-
-const luauScript = fs.readFileSync(SCRIPT_PATH, "utf8");
 
 // Check if place file exists
 if (!fs.existsSync(PLACE_FILE_PATH)) {
@@ -36,7 +33,20 @@ const response = await axios({
 });
 const PLACE_VERSION = response.data.versionNumber;
 
-const cloudResult = await runCloudLuau(SCRIPT_PATH, {
+// Get test filter from environment variable (set by VS Code extension)
+const testNamePattern = process.env.JEST_TEST_NAME_PATTERN || "";
+
+// Build the Luau script with optional test filter
+let luauScript = "local output = require(game.ReplicatedStorage.src.runTests)";
+if (testNamePattern) {
+	// Escape the pattern for Lua string
+	const escapedPattern = testNamePattern.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+	luauScript += `("${escapedPattern}")`;
+} else {
+	luauScript += "()";
+}
+
+const cloudResult = await runCloudLuau(PLACE_FILE_PATH, {
 	scriptContents: luauScript,
 	placeVersion: PLACE_VERSION,
 });

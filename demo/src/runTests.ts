@@ -1,7 +1,8 @@
 import { runCLI } from "@rbxts/jest";
-import { ReplicatedStorage, ServerStorage } from "@rbxts/services";
 
-export = () => {
+// Accept optional test filter pattern
+// This can be passed from the VS Code extension to run specific tests
+export = (testNamePattern?: string) => {
 	// force chalk to load with the right color level
 	const [chalkSuccess, Chalk] = import("@rbxts-js/chalk-lua").await();
 	if (chalkSuccess) {
@@ -10,14 +11,16 @@ export = () => {
 
 	const cwd = script.Parent!;
 
-	// run jest
-	const [success, output] = runCLI(
-		cwd,
-		{
-			setupFiles: [cwd.FindFirstChild("setup") as ModuleScript],
-		},
-		[cwd],
-	).await();
+	// Build Jest options
+	const jestOptions: { setupFiles: ModuleScript[]; testNamePattern?: string } = {
+		setupFiles: [cwd.FindFirstChild("setup") as ModuleScript],
+	};
 
-	print(output);
+	// Add test name filter if provided
+	if (testNamePattern !== undefined && testNamePattern !== "") {
+		jestOptions.testNamePattern = testNamePattern;
+	}
+
+	// run jest
+	runCLI(cwd, jestOptions, [cwd]).await();
 };
