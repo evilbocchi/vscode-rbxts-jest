@@ -3,6 +3,7 @@
     "displayName": "rbxts-jest",
     "description": "Use @rbxts/jest with Pleasure.",
     "version": "0.0.1",
+    "publisher": "evilbocchi",
     "engines": {
         "vscode": "^1.106.0"
     },
