@@ -1,4 +1,4 @@
-<div style="text-align: center;">
+<div align="center">
     <img src="./branding/logo.png/" width="128" height="128"/>
 </div>
 
