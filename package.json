@@ -10,8 +10,7 @@
         "Testing"
     ],
     "activationEvents": [
-        "workspaceContains:**/*.spec.ts",
-        "onStartupFinished"
+        "workspaceContains:**/package.json"
     ],
     "main": "./out/extension.js",
     "contributes": {
@@ -24,6 +23,11 @@
             {
                 "command": "vscode-rbxts-jest.runAllTests",
                 "title": "Run All Tests",
+                "category": "rbxts-jest"
+            },
+            {
+                "command": "vscode-rbxts-jest.toggleWatchMode",
+                "title": "Toggle Watch Mode",
                 "category": "rbxts-jest"
             }
         ],
@@ -42,9 +46,27 @@
                     "type": "string",
                     "default": "demo",
                     "description": "Path to the demo folder containing the test runner"
+                },
+                "rbxts-jest.watchPatterns": {
+                    "type": "array",
+                    "default": [
+                        "**/*.ts",
+                        "**/*.tsx",
+                        "**/*.lua",
+                        "**/*.luau"
+                    ],
+                    "description": "Glob patterns for files that trigger test re-runs in watch mode"
+                },
+                "rbxts-jest.watchDebounceDelay": {
+                    "type": "number",
+                    "default": 500,
+                    "description": "Delay in milliseconds before re-running tests after a file change"
                 }
             }
         }
+    },
+    "repository": {
+        "url": "https://www.github.com/evilbocchi/vscode-rbxts-jest"
     },
     "scripts": {
         "vscode:prepublish": "npm run compile",
