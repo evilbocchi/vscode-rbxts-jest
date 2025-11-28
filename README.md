@@ -21,7 +21,7 @@ Run your [roblox-ts](https://roblox-ts.com/) Jest tests directly from the VS Cod
   - `LUAU_EXECUTION_UNIVERSE_ID`
   - `LUAU_EXECUTION_PLACE_ID`
 
-> **Tip:** The extension looks for a `package.json` with a `test` script in the workspace root, in the configured `demoPath`, or one directory above the workspace. Make sure one of those locations exposes an appropriate runner.
+> **Tip:** The extension looks for a `package.json` with a `test` script in the workspace root, in the configured `rbxtsProjectPath`, or one directory above the workspace. Make sure one of those locations exposes an appropriate runner.
 
 ## Getting Started
 1. Install the extension (from the Marketplace or by running `npm install && npm run compile` and using VS Code's `Install from VSIX...`).
@@ -44,13 +44,13 @@ You can access these commands from the Command Palette (`Ctrl+Shift+P`) or map t
 | Setting                | Default                                         | Description                                                                                                           |
 | ---------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | `rbxts-jest.testMatch` | `["**/__tests__/**/*.spec.ts", "**/*.spec.ts"]` | Glob patterns used during discovery.                                                                                  |
-| `rbxts-jest.demoPath`  | `"demo"`                                        | Fallback location inspected for a `package.json` with a `test` script. Update if you keep the bundled demo elsewhere. |
+| `rbxts-jest.rbxtsProjectPath`  | None                                        | Fallback location inspected for a `package.json` with a `test` script. Update if you keep the bundled roblox-ts project elsewhere. |
 
 ## How Test Execution Works
 1. **Discovery**: `TestParser` scans each matching spec file to build a nested tree of `describe` and `it` nodes.
 2. **Run request**: Starting a run collects all selected leaf nodes (individual tests) and their parents.
 3. **Filtering**: If you triggered a subset of tests, the extension builds a `JEST_TEST_NAME_PATTERN` regex from their full names. Your `npm test` script can read this env var to filter execution.
-4. **Execution**: `npm test` is executed from the first folder that exposes the script (workspace root, `demoPath`, or parent). The bundled demo compiles the project, republishes the `place.rbxl`, and calls Roblox Cloud Luau to execute `src/runTests.ts`.
+4. **Execution**: `npm test` is executed from the first folder that exposes the script (workspace root, `rbxtsProjectPath`, or parent). The bundled demo compiles the project, republishes the `place.rbxl`, and calls Roblox Cloud Luau to execute `src/runTests.ts`.
 5. **Result parsing**: Standard Jest glyphs (`✓`, `✕`, `●`, etc.) in stdout/stderr are mapped back to VS Code test results so passes, failures, and messages appear inline.
 
 If the command cannot start, every pending test is marked as errored with the surfaced message to help diagnose missing tools or environment variables.
@@ -63,7 +63,7 @@ npm run build  # compiles TypeScript and rebuilds place.rbxl via rojo
 npm test       # builds and invokes demo/runTests.js
 ```
 
-`demo/runTests.js` deploys `demo/place.rbxl` to the Roblox Cloud experience specified by the environment variables and then runs `src/runTests.ts`. This file requires `@rbxts/jest` and exposes any failures through stdout, which the extension parses. Adapt this structure for your own experience by editing `demo/runTests.ts` or pointing `rbxts-jest.demoPath` at your project.
+`demo/runTests.js` deploys `demo/place.rbxl` to the Roblox Cloud experience specified by the environment variables and then runs `src/runTests.ts`. This file requires `@rbxts/jest` and exposes any failures through stdout, which the extension parses. Adapt this structure for your own experience by editing `demo/runTests.ts` or pointing `rbxts-jest.rbxtsProjectPath` at your project.
 
 ## Development
 Interested in hacking on the extension itself?

@@ -44,10 +44,10 @@
                     ],
                     "description": "Glob patterns to match test files"
                 },
-                "rbxts-jest.demoPath": {
+                "rbxts-jest.rbxtsProjectPath": {
                     "type": "string",
-                    "default": "demo",
-                    "description": "Path to the demo folder containing the test runner"
+                    "default": "",
+                    "description": "Path to the roblox-ts project folder containing the test runner"
                 },
                 "rbxts-jest.watchPatterns": {
                     "type": "array",

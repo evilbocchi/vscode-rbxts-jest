@@ -1,6 +1,6 @@
-import * as vscode from "vscode";
 import * as path from "path";
-import { TestParser, TestItem as ParsedTestItem } from "./testParser";
+import * as vscode from "vscode";
+import { TestItem as ParsedTestItem, TestParser } from "./testParser";
 
 export class RbxtsJestTestController {
     private controller: vscode.TestController;
@@ -181,7 +181,7 @@ export class RbxtsJestTestController {
         token: vscode.CancellationToken,
     ): Promise<void> {
         const config = vscode.workspace.getConfiguration("rbxts-jest");
-        const demoPath = config.get<string>("demoPath") || "demo";
+        const rbxtsProjectPath = config.get<string>("rbxtsProjectPath");
 
         // Build test name pattern for filtering
         const testNamePattern = this.buildTestNamePattern(tests);
@@ -203,11 +203,18 @@ export class RbxtsJestTestController {
             const workspaceRoot = workspaceFolder.uri.fsPath;
 
             // Check multiple possible locations for package.json with test script
-            const possiblePaths = [
-                workspaceRoot, // Current workspace root
-                path.join(workspaceRoot, demoPath), // Configured demo path
-                path.join(workspaceRoot, ".."), // Parent folder (if workspace is demo)
-            ];
+            const possiblePaths = new Array<string>();
+
+            if (rbxtsProjectPath) {
+                possiblePaths.push(
+                    path.isAbsolute(rbxtsProjectPath) ? rbxtsProjectPath : path.join(workspaceRoot, rbxtsProjectPath),
+                );
+            } else {
+                possiblePaths.push(
+                    workspaceRoot, // Current workspace root
+                    path.join(workspaceRoot, ".."), // Parent folder
+                );
+            }
 
             let testFolder: string | undefined;
             for (const testPath of possiblePaths) {
@@ -253,8 +260,8 @@ export class RbxtsJestTestController {
      */
     private buildTestNamePattern(tests: vscode.TestItem[]): string {
         // Get only leaf tests (actual it() blocks, not describe blocks or files)
-        const leafTests = tests.filter(t => t.children.size === 0);
-        
+        const leafTests = tests.filter((t) => t.children.size === 0);
+
         if (leafTests.length === 0) {
             return ""; // Run all tests
         }
@@ -268,7 +275,7 @@ export class RbxtsJestTestController {
 
         // Build pattern from test names
         // We need to build the full path: "describe name test name"
-        const testPatterns = leafTests.map(test => {
+        const testPatterns = leafTests.map((test) => {
             const fullName = this.getFullTestName(test);
             // Escape regex special characters in the test name
             return this.escapeRegex(fullName);
@@ -284,10 +291,10 @@ export class RbxtsJestTestController {
             if (item.children.size === 0) {
                 count++;
             } else {
-                item.children.forEach(child => countInItem(child));
+                item.children.forEach((child) => countInItem(child));
             }
         };
-        this.controller.items.forEach(item => countInItem(item));
+        this.controller.items.forEach((item) => countInItem(item));
         return count;
     }
 
@@ -298,7 +305,7 @@ export class RbxtsJestTestController {
     private getFullTestName(item: vscode.TestItem): string {
         const parts: string[] = [];
         let current: vscode.TestItem | undefined = item;
-        
+
         while (current) {
             // Skip file-level items (where id equals the file URI)
             const isFileLevel = current.uri && current.id === current.uri.toString();
@@ -307,17 +314,17 @@ export class RbxtsJestTestController {
             }
             current = this.findParent(current);
         }
-        
+
         return parts.join(" ");
     }
 
     private findParent(item: vscode.TestItem): vscode.TestItem | undefined {
         // Find parent by checking if any item contains this one as a child
         let parent: vscode.TestItem | undefined;
-        
+
         const searchInItem = (searchItem: vscode.TestItem): boolean => {
             let found = false;
-            searchItem.children.forEach(child => {
+            searchItem.children.forEach((child) => {
                 if (child.id === item.id) {
                     parent = searchItem;
                     found = true;
@@ -328,7 +335,7 @@ export class RbxtsJestTestController {
             return found;
         };
 
-        this.controller.items.forEach(rootItem => {
+        this.controller.items.forEach((rootItem) => {
             if (!parent) {
                 searchInItem(rootItem);
             }
@@ -348,7 +355,7 @@ export class RbxtsJestTestController {
             return {
                 exitCode: 1,
                 stdout: "",
-                stderr: `Demo folder not found: ${cwd}`,
+                stderr: `Folder not found: ${cwd}`,
                 success: false,
             };
         }
@@ -359,8 +366,6 @@ export class RbxtsJestTestController {
             // Use exec instead of spawn for better cross-platform compatibility
             const command = "npm test";
             let cancelled = false;
-
-
 
             // Pass test name pattern via environment variable
             const env = { ...process.env };
@@ -410,8 +415,6 @@ export class RbxtsJestTestController {
 
     private parseAndReportResults(tests: vscode.TestItem[], run: vscode.TestRun, result: TestRunResult): void {
         const output = result.stdout + "\n" + result.stderr;
-
-
 
         // Parse the Jest output to determine which tests passed/failed
         // Jest-lua uses similar format to Jest:
