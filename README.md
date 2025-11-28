@@ -16,10 +16,7 @@ Run your [roblox-ts](https://roblox-ts.com/) Jest tests directly from the VS Cod
 ## Requirements
 - VS Code 1.106.0 or newer.
 - Node.js 18+ (needed for the extension host and the demo project scripts).
-- A workspace with an `npm test` script that ultimately runs your Jest-Luau tests. The included demo uses Roblox Cloud APIs, which require:
-  - `LUAU_EXECUTION_KEY`
-  - `LUAU_EXECUTION_UNIVERSE_ID`
-  - `LUAU_EXECUTION_PLACE_ID`
+- A workspace with an `npm test` script that ultimately runs your Jest-Luau tests. The included demo uses [rbxluau](https://github.com/Unreal-Works/roblox-luau-execute) to run tests in the Roblox Cloud.
 
 > **Tip:** The extension looks for a `package.json` with a `test` script in the workspace root, in the configured `rbxtsProjectPath`, or one directory above the workspace. Make sure one of those locations exposes an appropriate runner.
 
@@ -63,7 +60,7 @@ npm run build  # compiles TypeScript and rebuilds place.rbxl via rojo
 npm test       # builds and invokes demo/runTests.js
 ```
 
-`demo/runTests.js` deploys `demo/place.rbxl` to the Roblox Cloud experience specified by the environment variables and then runs `src/runTests.ts`. This file requires `@rbxts/jest` and exposes any failures through stdout, which the extension parses. Adapt this structure for your own experience by editing `demo/runTests.ts` or pointing `rbxts-jest.rbxtsProjectPath` at your project.
+`demo/runTests.js` deploys `demo/place.rbxl` to Roblox and then runs `src/runTests.ts`. This file requires `@rbxts/jest` and exposes any failures through stdout, which the extension parses. Adapt this structure for your own experience by editing `demo/runTests.ts` or pointing `rbxts-jest.rbxtsProjectPath` at your project.
 
 ## Development
 Interested in hacking on the extension itself?

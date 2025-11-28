@@ -3,6 +3,4 @@ dist
 node_modules
 .vscode-test/
 *.vsix
-/demo/place.rbxl
 .env
-/demo/include
