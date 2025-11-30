@@ -14,7 +14,7 @@ if (testNamePattern) {
 	const escapedPattern = testNamePattern.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 	luauScript += `("${escapedPattern}")`;
 } else {
-	luauScript += "()";
+	luauScript += "(); return output";
 }
 
 rbxluau.executeLuau(luauScript, {

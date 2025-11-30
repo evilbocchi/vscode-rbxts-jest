@@ -21,6 +21,15 @@ export = (testNamePattern?: string) => {
 		jestOptions.testNamePattern = testNamePattern;
 	}
 
-	// run jest
-	runCLI(cwd, jestOptions, [cwd]).await();
+	// run jest and capture results
+	const [success, resolved] = runCLI(cwd, jestOptions, [cwd]).await();
+
+    if (!success) {
+        warn("Jest CLI failed to run.");
+        return 1;
+    }
+
+    const results = resolved.results;
+	const hasFailures = !results.success || results.numFailedTests > 0 || results.numFailedTestSuites > 0;
+	return hasFailures ? 1 : 0;
 };
