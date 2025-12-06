@@ -414,7 +414,14 @@ export class RbxtsJestTestController {
     }
 
     private parseAndReportResults(tests: vscode.TestItem[], run: vscode.TestRun, result: TestRunResult): void {
-        const output = result.stdout + "\n" + result.stderr;
+        const rawOutput = `${result.stdout}\n${result.stderr}`;
+        const cleanedOutput = this.stripAnsiCodes(rawOutput).replace(/\r/g, "");
+        const failedInfo = this.extractFailedTestInfo(cleanedOutput);
+        const normalizedFailedLabels = new Set(failedInfo.map((info) => info.normalizedTestName));
+        const normalizedFailedFullNames = new Set(failedInfo.map((info) => info.normalizedFullName));
+        const summaryIndicatesFailures = /Test Suites:\s*\d+\s+failed/i.test(cleanedOutput) || /Tests:\s*\d+\s+failed/i.test(cleanedOutput);
+        const overallFailuresDetected = failedInfo.length > 0 || summaryIndicatesFailures;
+        const runnerError = !result.success && !overallFailuresDetected;
 
         // Parse the Jest output to determine which tests passed/failed
         // Jest-lua uses similar format to Jest:
@@ -430,37 +437,43 @@ export class RbxtsJestTestController {
 
             const testName = test.label;
             const escapedName = this.escapeRegex(testName);
+            const normalizedLabel = this.normalizeTestName(testName);
+            const fullName = this.getFullTestName(test);
+            const normalizedFullName = this.normalizeTestName(fullName);
 
             // Look for test results in the output
             // Handle various pass/fail symbols
-            const passPattern = new RegExp(`[✓✔√]\\s*${escapedName}`, "i");
-            const failPattern = new RegExp(`[✕✗×✘]\\s*${escapedName}`, "i");
+            const passPattern = new RegExp(`[✓✔√][^\n]*${escapedName}`, "i");
+            const failPattern = new RegExp(`[✕✗×✘][^\n]*${escapedName}`, "i");
 
             // Also check for the test name in error sections (● marker)
             const inErrorSection = new RegExp(`●[^●]*${escapedName}`, "is");
 
             // Determine test result
-            const hasFail = failPattern.test(output) || inErrorSection.test(output);
-            const hasPass = passPattern.test(output);
+            const hasFail =
+                failPattern.test(cleanedOutput) ||
+                inErrorSection.test(cleanedOutput) ||
+                normalizedFailedLabels.has(normalizedLabel) ||
+                normalizedFailedFullNames.has(normalizedFullName);
+            const hasPass = passPattern.test(cleanedOutput);
 
             if (hasFail) {
                 // Extract error message for this specific test
-                const message = this.extractErrorMessage(output, testName);
+                const message = this.extractErrorMessage(cleanedOutput, testName);
                 run.failed(test, new vscode.TestMessage(message));
             } else if (hasPass) {
                 run.passed(test);
             } else {
-                // Couldn't determine - use exit code
-                if (result.success) {
-                    run.passed(test);
+                if (runnerError) {
+                    run.errored(test, new vscode.TestMessage(`Test run failed before completing. Check output.`));
                 } else {
-                    run.failed(test, new vscode.TestMessage(`Test may have failed. Check output for details.`));
+                    run.passed(test);
                 }
             }
         }
 
         // Append the full output to the run
-        run.appendOutput(output.replace(/\r?\n/g, "\r\n"));
+        run.appendOutput(rawOutput.replace(/\r?\n/g, "\r\n"));
     }
 
     private extractErrorMessage(output: string, testName: string): string {
@@ -521,6 +534,44 @@ export class RbxtsJestTestController {
         return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     }
 
+    private stripAnsiCodes(text: string): string {
+        return text.replace(/\u001b\[[0-9;?]*[ -\/]*[@-~]/g, "");
+    }
+
+    private normalizeTestName(name: string): string {
+        return name.replace(/\s+/g, " ").trim().toLowerCase();
+    }
+
+    private extractFailedTestInfo(output: string): FailedTestInfo[] {
+        const failures: FailedTestInfo[] = [];
+        const headerPattern = /^[ \t]*●\s+(.+)$/gim;
+        let match: RegExpExecArray | null;
+
+        while ((match = headerPattern.exec(output)) !== null) {
+            const header = match[1].trim();
+            if (!header) {
+                continue;
+            }
+
+            const segments = header.split(/›/).map((segment) => segment.trim()).filter((segment) => segment.length > 0);
+            if (segments.length === 0) {
+                continue;
+            }
+
+            const testName = segments[segments.length - 1];
+            const fullName = segments.join(" ");
+            failures.push({
+                originalHeader: header,
+                testName,
+                fullName,
+                normalizedTestName: this.normalizeTestName(testName),
+                normalizedFullName: this.normalizeTestName(fullName),
+            });
+        }
+
+        return failures;
+    }
+
     public dispose(): void {
         this.controller.dispose();
         this.fileWatcher?.dispose();
@@ -532,4 +583,12 @@ interface TestRunResult {
     stdout: string;
     stderr: string;
     success: boolean;
+}
+
+interface FailedTestInfo {
+    originalHeader: string;
+    testName: string;
+    fullName: string;
+    normalizedTestName: string;
+    normalizedFullName: string;
 }
