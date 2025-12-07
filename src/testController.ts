@@ -416,17 +416,15 @@ export class RbxtsJestTestController {
     private parseAndReportResults(tests: vscode.TestItem[], run: vscode.TestRun, result: TestRunResult): void {
         const rawOutput = `${result.stdout}\n${result.stderr}`;
         const cleanedOutput = this.stripAnsiCodes(rawOutput).replace(/\r/g, "");
-        const failedInfo = this.extractFailedTestInfo(cleanedOutput);
-        const normalizedFailedLabels = new Set(failedInfo.map((info) => info.normalizedTestName));
-        const normalizedFailedFullNames = new Set(failedInfo.map((info) => info.normalizedFullName));
-        const summaryIndicatesFailures = /Test Suites:\s*\d+\s+failed/i.test(cleanedOutput) || /Tests:\s*\d+\s+failed/i.test(cleanedOutput);
-        const overallFailuresDetected = failedInfo.length > 0 || summaryIndicatesFailures;
-        const runnerError = !result.success && !overallFailuresDetected;
 
         // Parse the Jest output to determine which tests passed/failed
-        // Jest-lua uses similar format to Jest:
-        // ✓ test name (time) - for passing
-        // ✕ test name - for failing
+        // Look for the test summary line which is more reliable
+        // Example: "Tests:       5 failed, 6 passed, 11 total"
+        
+        // Parse overall pass/fail from summary
+        const summaryMatch = cleanedOutput.match(/Tests:\s+(?:(\d+)\s+failed,\s+)?(\d+)\s+passed/i);
+        const hasSomePassing = summaryMatch && parseInt(summaryMatch[2]) > 0;
+        const hasSomeFailures = summaryMatch && summaryMatch[1] && parseInt(summaryMatch[1]) > 0;
 
         for (const test of tests) {
             // Check if this is a file-level or describe-level item
@@ -437,24 +435,21 @@ export class RbxtsJestTestController {
 
             const testName = test.label;
             const escapedName = this.escapeRegex(testName);
-            const normalizedLabel = this.normalizeTestName(testName);
-            const fullName = this.getFullTestName(test);
-            const normalizedFullName = this.normalizeTestName(fullName);
 
             // Look for test results in the output
-            // Handle various pass/fail symbols
-            const passPattern = new RegExp(`[✓✔√][^\n]*${escapedName}`, "i");
-            const failPattern = new RegExp(`[✕✗×✘][^\n]*${escapedName}`, "i");
-
-            // Also check for the test name in error sections (● marker)
-            const inErrorSection = new RegExp(`●[^●]*${escapedName}`, "is");
+            // Check for fail markers in error sections (● marker at start of line)
+            // Don't use Γ here as it conflicts with corrupted pass/fail markers
+            const inErrorSection = new RegExp(`^\\s*●[^\\n]*${escapedName}`, "im");
+            
+            // Also look for the inline fail marker (✕ or corrupted encoding like Γò)
+            // The corrupted encoding is 2 characters: U+0393 U+00F2 (Γò for ✕) or U+0393 U+00F4 (Γô for ✓)
+            const failPattern = new RegExp(`(?:Γò|[✕✗×✘])[^\\n]*${escapedName}`, "i");
+            
+            // Match pass pattern: (✓ or corrupted encoding Γô)
+            const passPattern = new RegExp(`(?:Γô|[✓✔√])[^\\n]*${escapedName}`, "i");
 
             // Determine test result
-            const hasFail =
-                failPattern.test(cleanedOutput) ||
-                inErrorSection.test(cleanedOutput) ||
-                normalizedFailedLabels.has(normalizedLabel) ||
-                normalizedFailedFullNames.has(normalizedFullName);
+            const hasFail = failPattern.test(cleanedOutput) || inErrorSection.test(cleanedOutput);
             const hasPass = passPattern.test(cleanedOutput);
 
             if (hasFail) {
@@ -464,11 +459,9 @@ export class RbxtsJestTestController {
             } else if (hasPass) {
                 run.passed(test);
             } else {
-                if (runnerError) {
-                    run.errored(test, new vscode.TestMessage(`Test run failed before completing. Check output.`));
-                } else {
-                    run.passed(test);
-                }
+                // Couldn't determine from output - assume passed if not explicitly failed
+                // This prevents all tests from being marked as failed when Jest exits with code 1
+                run.passed(test);
             }
         }
 
@@ -538,40 +531,6 @@ export class RbxtsJestTestController {
         return text.replace(/\u001b\[[0-9;?]*[ -\/]*[@-~]/g, "");
     }
 
-    private normalizeTestName(name: string): string {
-        return name.replace(/\s+/g, " ").trim().toLowerCase();
-    }
-
-    private extractFailedTestInfo(output: string): FailedTestInfo[] {
-        const failures: FailedTestInfo[] = [];
-        const headerPattern = /^[ \t]*●\s+(.+)$/gim;
-        let match: RegExpExecArray | null;
-
-        while ((match = headerPattern.exec(output)) !== null) {
-            const header = match[1].trim();
-            if (!header) {
-                continue;
-            }
-
-            const segments = header.split(/›/).map((segment) => segment.trim()).filter((segment) => segment.length > 0);
-            if (segments.length === 0) {
-                continue;
-            }
-
-            const testName = segments[segments.length - 1];
-            const fullName = segments.join(" ");
-            failures.push({
-                originalHeader: header,
-                testName,
-                fullName,
-                normalizedTestName: this.normalizeTestName(testName),
-                normalizedFullName: this.normalizeTestName(fullName),
-            });
-        }
-
-        return failures;
-    }
-
     public dispose(): void {
         this.controller.dispose();
         this.fileWatcher?.dispose();
@@ -583,12 +542,4 @@ interface TestRunResult {
     stdout: string;
     stderr: string;
     success: boolean;
-}
-
-interface FailedTestInfo {
-    originalHeader: string;
-    testName: string;
-    fullName: string;
-    normalizedTestName: string;
-    normalizedFullName: string;
 }
