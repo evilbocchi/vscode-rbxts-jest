@@ -6,7 +6,7 @@ import { RbxtsJestTestController } from "./testController";
 let testController: RbxtsJestTestController | undefined;
 let watchModeEnabled = false;
 let watchModeStatusBar: vscode.StatusBarItem | undefined;
-let sourceFileWatcher: vscode.FileSystemWatcher | undefined;
+let sourceFileWatchers: vscode.FileSystemWatcher[] = [];
 let debounceTimer: NodeJS.Timeout | undefined;
 let isRunningTests = false;
 
@@ -58,7 +58,7 @@ export async function activate(context: vscode.ExtensionContext) {
     console.log("rbxts-jest extension is now active!");
 
     // Create the test controller
-    testController = new RbxtsJestTestController(context);
+    testController = new RbxtsJestTestController(context, () => watchModeEnabled);
 
     // Register the refresh command
     const refreshCommand = vscode.commands.registerCommand("vscode-rbxts-jest.refreshTests", async () => {
@@ -96,10 +96,7 @@ export function deactivate() {
         testController.dispose();
         testController = undefined;
     }
-    if (sourceFileWatcher) {
-        sourceFileWatcher.dispose();
-        sourceFileWatcher = undefined;
-    }
+    disposeSourceFileWatchers();
     if (debounceTimer) {
         clearTimeout(debounceTimer);
     }
@@ -113,10 +110,7 @@ function toggleWatchMode(context: vscode.ExtensionContext): void {
         setupSourceFileWatcher(context);
         vscode.window.showInformationMessage("rbxts-jest: Watch mode enabled. Tests will re-run on file changes.");
     } else {
-        if (sourceFileWatcher) {
-            sourceFileWatcher.dispose();
-            sourceFileWatcher = undefined;
-        }
+        disposeSourceFileWatchers();
         vscode.window.showInformationMessage("rbxts-jest: Watch mode disabled.");
     }
 }
@@ -137,19 +131,33 @@ function updateWatchModeStatusBar(): void {
     }
 }
 
-function setupSourceFileWatcher(context: vscode.ExtensionContext): void {
-    // Dispose existing watcher if any
-    if (sourceFileWatcher) {
-        sourceFileWatcher.dispose();
+function disposeSourceFileWatchers(): void {
+    if (sourceFileWatchers.length === 0) {
+        return;
     }
 
-    const config = vscode.workspace.getConfiguration("rbxts-jest");
-    const watchPatterns = config.get<string[]>("watchPatterns") || ["**/*.ts", "**/*.tsx", "**/*.lua", "**/*.luau"];
-    const debounceDelay = config.get<number>("watchDebounceDelay") || 500;
+    for (const watcher of sourceFileWatchers) {
+        watcher.dispose();
+    }
+    sourceFileWatchers = [];
+}
 
-    // Create a composite pattern
-    const pattern = `{${watchPatterns.join(",")}}`;
-    sourceFileWatcher = vscode.workspace.createFileSystemWatcher(pattern);
+function setupSourceFileWatcher(context: vscode.ExtensionContext): void {
+    disposeSourceFileWatchers();
+
+    const config = vscode.workspace.getConfiguration("rbxts-jest");
+    const configuredPatterns = config.get<string | string[]>("watchPatterns");
+    const watchPatterns = Array.isArray(configuredPatterns)
+        ? configuredPatterns
+        : configuredPatterns
+        ? [configuredPatterns]
+        : ["**/*.lua", "**/*.luau"];
+    const debounceDelay = config.get<number>("watchDebounceDelay") || 500;
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+
+    if (!workspaceFolders || workspaceFolders.length === 0) {
+        return;
+    }
 
     const onFileChange = (uri: vscode.Uri) => {
         // Ignore if tests are already running
@@ -160,22 +168,26 @@ function setupSourceFileWatcher(context: vscode.ExtensionContext): void {
         const filePath = uri.fsPath.toLowerCase();
 
         // Ignore node_modules and output directories
-        if (filePath.includes("node_modules") || 
-            filePath.includes("\\out\\") || 
+        if (
+            filePath.includes("node_modules") ||
+            filePath.includes("\\out\\") ||
             filePath.includes("/out/") ||
             filePath.includes("\\include\\") ||
-            filePath.includes("/include/")) {
+            filePath.includes("/include/")
+        ) {
             return;
         }
 
         // Ignore binary/generated files
-        if (filePath.endsWith(".rbxl") || 
-            filePath.endsWith(".rbxlx") || 
-            filePath.endsWith(".rbxm") || 
+        if (
+            filePath.endsWith(".rbxl") ||
+            filePath.endsWith(".rbxlx") ||
+            filePath.endsWith(".rbxm") ||
             filePath.endsWith(".rbxmx") ||
             filePath.endsWith(".d.ts") ||
             filePath.endsWith(".js") ||
-            filePath.endsWith(".map")) {
+            filePath.endsWith(".map")
+        ) {
             return;
         }
 
@@ -187,7 +199,7 @@ function setupSourceFileWatcher(context: vscode.ExtensionContext): void {
         debounceTimer = setTimeout(async () => {
             if (watchModeEnabled && !isRunningTests) {
                 isRunningTests = true;
-                
+
                 try {
                     // Update status bar to show running
                     if (watchModeStatusBar) {
@@ -210,9 +222,14 @@ function setupSourceFileWatcher(context: vscode.ExtensionContext): void {
         }, debounceDelay);
     };
 
-    sourceFileWatcher.onDidChange(onFileChange);
-    sourceFileWatcher.onDidCreate(onFileChange);
-    sourceFileWatcher.onDidDelete(onFileChange);
-
-    context.subscriptions.push(sourceFileWatcher);
+    for (const folder of workspaceFolders) {
+        for (const pattern of watchPatterns) {
+            const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(folder, pattern));
+            watcher.onDidChange(onFileChange);
+            watcher.onDidCreate(onFileChange);
+            watcher.onDidDelete(onFileChange);
+            context.subscriptions.push(watcher);
+            sourceFileWatchers.push(watcher);
+        }
+    }
 }

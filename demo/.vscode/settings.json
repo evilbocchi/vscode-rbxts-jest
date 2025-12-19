@@ -1,0 +1,3 @@
+{
+    "rbxts-jest.testCommandInWatch": "npm run dev:test",
+}

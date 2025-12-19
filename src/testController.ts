@@ -5,13 +5,15 @@ import { TestItem as ParsedTestItem, TestParser } from "./testParser";
 export class RbxtsJestTestController {
     private controller: vscode.TestController;
     private testParser: TestParser;
-    private fileWatcher: vscode.FileSystemWatcher | undefined;
+    private fileWatchers: vscode.FileSystemWatcher[] = [];
     private testItemMap: Map<string, vscode.TestItem> = new Map();
+    private watchModeEnabled: () => boolean;
 
-    constructor(private context: vscode.ExtensionContext) {
+    constructor(private context: vscode.ExtensionContext, watchModeEnabled: () => boolean) {
+        this.watchModeEnabled = watchModeEnabled;
         this.controller = vscode.tests.createTestController("rbxts-jest-tests", "rbxts-jest Tests");
         this.testParser = new TestParser();
-
+        
         // Create run profile for running tests
         this.controller.createRunProfile(
             "Run Tests",
@@ -33,16 +35,34 @@ export class RbxtsJestTestController {
 
     private setupFileWatcher(): void {
         const config = vscode.workspace.getConfiguration("rbxts-jest");
-        const testPatterns = config.get<string[]>("testMatch") || ["**/__tests__/**/*.spec.ts", "**/*.spec.ts"];
+        const configuredPatterns = config.get<string | string[]>("testMatch");
+        const testPatterns = Array.isArray(configuredPatterns)
+            ? configuredPatterns
+            : configuredPatterns
+                ? [configuredPatterns]
+                : ["**/__tests__/**/*.spec.ts", "**/*.spec.ts"];
+        const workspaceFolders = vscode.workspace.workspaceFolders;
 
-        // Watch for changes in test files
-        this.fileWatcher = vscode.workspace.createFileSystemWatcher("**/*.spec.ts");
+        if (!workspaceFolders || workspaceFolders.length === 0) {
+            return;
+        }
 
-        this.fileWatcher.onDidCreate((uri) => this.onTestFileChanged(uri));
-        this.fileWatcher.onDidChange((uri) => this.onTestFileChanged(uri));
-        this.fileWatcher.onDidDelete((uri) => this.onTestFileDeleted(uri));
+        this.disposeFileWatchers();
 
-        this.context.subscriptions.push(this.fileWatcher);
+        for (const folder of workspaceFolders) {
+            for (const pattern of testPatterns) {
+                const watcher = vscode.workspace.createFileSystemWatcher(
+                    new vscode.RelativePattern(folder, pattern),
+                );
+
+                watcher.onDidCreate((uri) => this.onTestFileChanged(uri));
+                watcher.onDidChange((uri) => this.onTestFileChanged(uri));
+                watcher.onDidDelete((uri) => this.onTestFileDeleted(uri));
+
+                this.context.subscriptions.push(watcher);
+                this.fileWatchers.push(watcher);
+            }
+        }
     }
 
     private async onTestFileChanged(uri: vscode.Uri): Promise<void> {
@@ -363,8 +383,13 @@ export class RbxtsJestTestController {
         return new Promise((resolve, reject) => {
             const cp = require("child_process");
 
-            // Use exec instead of spawn for better cross-platform compatibility
-            const command = "npm test";
+            // Get test command from configuration
+            const config = vscode.workspace.getConfiguration("rbxts-jest");
+            const baseCommand = config.get<string>("testCommand") || "npm test";
+            const watchCommand = config.get<string>("testCommandInWatch") || "";
+            
+            // Use watchCommand if watch mode is enabled and watchCommand is configured
+            const command = this.watchModeEnabled() && watchCommand ? watchCommand : baseCommand;
             let cancelled = false;
 
             // Pass test name pattern via environment variable
@@ -533,7 +558,18 @@ export class RbxtsJestTestController {
 
     public dispose(): void {
         this.controller.dispose();
-        this.fileWatcher?.dispose();
+        this.disposeFileWatchers();
+    }
+
+    private disposeFileWatchers(): void {
+        if (this.fileWatchers.length === 0) {
+            return;
+        }
+
+        for (const watcher of this.fileWatchers) {
+            watcher.dispose();
+        }
+        this.fileWatchers = [];
     }
 }
 

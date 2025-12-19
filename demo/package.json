@@ -1,8 +1,12 @@
 {
 	"type": "module",
 	"scripts": {
-		"build": "rbxtsc && npx rojo build -o place.rbxl",
-		"test": "npm run build --silent && node runTests.js"
+		"build:src": "rbxtsc",
+		"build:place": "npx rojo build -o place.rbxl",
+		"build": "npm run build:src && npm run build:place",
+		"test": "npm run build:src --silent && npm run dev:test",
+		"dev:test": "npm run build:place --silent && node runTests.js",
+		"dev": "rbxtsc -w"
 	},
 	"license": "MIT",
 	"devDependencies": {

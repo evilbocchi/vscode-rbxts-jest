@@ -116,7 +116,7 @@ suite("RbxtsJestTestController", () => {
 			extensionUri: vscode.Uri.file(workspaceRoot),
 		} as unknown as vscode.ExtensionContext;
 
-		controller = new RbxtsJestTestController(context);
+		controller = new RbxtsJestTestController(context, () => false);
 	});
 
 	teardown(() => {

@@ -1,0 +1,54 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "npm: install",
+            "type": "shell",
+            "command": "npm install",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "never"
+            }
+        },
+        {
+            "label": "npm: dev",
+            "type": "shell",
+            "command": "npm run dev",
+            "isBackground": true,
+            "problemMatcher": [
+                "$tsc-watch",
+                {
+                    "owner": "typescript",
+                    "fileLocation": ["relative", "${workspaceFolder}"],
+                    "pattern": {
+                        "regexp": "^(.+\\.ts):(\\d+):(\\d+) - error TS roblox-ts: (.*)$",
+                        "file": 1,
+                        "line": 2,
+                        "column": 3,
+                        "message": 4
+                    }
+                }
+            ],
+            "presentation": {
+                "reveal": "never",
+                "group": "watchers",
+                "panel": "dedicated"
+            }
+        },
+        {
+            "label": "npm: install and dev",
+            "dependsOn": [
+                "npm: install",
+                "npm: dev"
+            ],
+            "dependsOrder": "sequence",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "runOptions": {
+                "runOn": "folderOpen"
+            }
+        }
+    ]
+}

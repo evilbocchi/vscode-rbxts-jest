@@ -49,11 +49,22 @@
                     "default": "",
                     "description": "Path to the roblox-ts project folder containing the test runner"
                 },
+                "rbxts-jest.testCommand": {
+                    "type": "string",
+                    "default": "npm test",
+                    "description": "Command to run tests (default: 'npm test'). Can be customized to use yarn, pnpm, or custom scripts."
+                },
+                "rbxts-jest.testCommandInWatch": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Command to run tests in watch mode (default: same as testCommand)."
+                },
                 "rbxts-jest.watchPatterns": {
                     "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
                     "default": [
-                        "**/*.ts",
-                        "**/*.tsx",
                         "**/*.lua",
                         "**/*.luau"
                     ],
@@ -79,14 +90,14 @@
         "test": "vscode-test"
     },
     "devDependencies": {
-        "@types/vscode": "^1.106.0",
         "@types/mocha": "^10.0.10",
         "@types/node": "20.x",
+        "@types/vscode": "^1.106.0",
         "@typescript-eslint/eslint-plugin": "^8.31.1",
         "@typescript-eslint/parser": "^8.31.1",
-        "eslint": "^9.25.1",
-        "typescript": "^5.8.3",
         "@vscode/test-cli": "^0.0.11",
-        "@vscode/test-electron": "^2.5.2"
+        "@vscode/test-electron": "^2.5.2",
+        "eslint": "^9.25.1",
+        "typescript": "^5.8.3"
     }
 }
