@@ -2,7 +2,7 @@
     "name": "vscode-rbxts-jest",
     "displayName": "rbxts-jest",
     "description": "Use @rbxts/jest with Pleasure.",
-    "version": "0.0.6",
+    "version": "0.0.7",
     "publisher": "evilbocchi",
     "icon": "branding/logo.png",
     "engines": {
