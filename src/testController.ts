@@ -451,6 +451,26 @@ export class RbxtsJestTestController {
         const hasSomePassing = summaryMatch && parseInt(summaryMatch[2]) > 0;
         const hasSomeFailures = summaryMatch && summaryMatch[1] && parseInt(summaryMatch[1]) > 0;
 
+        // Check if we have any test output at all - if the test runner failed before running tests
+        // (e.g., compilation error), there won't be a summary line
+        const hasTestOutput = summaryMatch !== null;
+
+        // If the command failed and there's no test output, it means the build/compilation failed
+        if (!result.success && !hasTestOutput) {
+            // Mark all tests as errored due to build/compilation failure
+            for (const test of tests) {
+                if (test.children.size > 0) {
+                    continue; // Skip parent items
+                }
+                run.errored(
+                    test,
+                    new vscode.TestMessage(`Test runner failed before executing tests.\n\n${rawOutput.trim()}`),
+                );
+            }
+            run.appendOutput(rawOutput.replace(/\r?\n/g, "\r\n"));
+            return;
+        }
+
         for (const test of tests) {
             // Check if this is a file-level or describe-level item
             if (test.children.size > 0) {
