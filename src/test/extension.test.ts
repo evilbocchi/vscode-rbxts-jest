@@ -213,6 +213,52 @@ suite("RbxtsJestTestController", () => {
 			"Run output should preserve captured stdout and stderr",
 		);
 	});
+
+	test("marks all tests as errored when compilation fails", () => {
+		const { passingTest, failingTest } = createTestTree();
+		const internals = controller as unknown as {
+			parseAndReportResults(tests: vscode.TestItem[], run: vscode.TestRun, result: TestRunResultShape): void;
+		};
+
+		const recorder = createRunRecorder();
+		const stderr = [
+			"src/example.ts(10,5): error TS2322: Type 'string' is not assignable to type 'number'.",
+			"src/example.ts(15,10): error TS2339: Property 'foo' does not exist on type 'Bar'.",
+			"",
+			"Found 2 errors.",
+		].join("\n");
+
+		const result: TestRunResultShape = {
+			exitCode: 1,
+			success: false,
+			stdout: "",
+			stderr,
+		};
+
+		internals.parseAndReportResults([passingTest, failingTest], recorder.run, result);
+
+		assert.strictEqual(recorder.passed.length, 0, "No tests should be marked as passed");
+		assert.strictEqual(recorder.failed.length, 0, "No tests should be marked as failed");
+		assert.strictEqual(recorder.errored.length, 2, "All tests should be marked as errored");
+		assert.strictEqual(
+			recorder.errored[0].test,
+			passingTest,
+			"First test should be marked as errored",
+		);
+		assert.strictEqual(
+			recorder.errored[1].test,
+			failingTest,
+			"Second test should be marked as errored",
+		);
+		assert.ok(
+			recorder.errored[0].messages[0].includes("Test runner failed before executing tests"),
+			"Error message should indicate runner failure",
+		);
+		assert.ok(
+			recorder.errored[0].messages[0].includes("error TS2322"),
+			"Error message should include compilation error details",
+		);
+	});
 });
 
 interface TestRunResultShape {
@@ -226,23 +272,36 @@ interface RunRecorder {
 	run: vscode.TestRun;
 	passed: vscode.TestItem[];
 	failed: Array<{ test: vscode.TestItem; messages: string[] }>;
+	errored: Array<{ test: vscode.TestItem; messages: string[] }>;
 	output: string[];
 }
 
 function createRunRecorder(): RunRecorder {
 	const passed: vscode.TestItem[] = [];
 	const failed: Array<{ test: vscode.TestItem; messages: string[] }> = [];
+	const errored: Array<{ test: vscode.TestItem; messages: string[] }> = [];
 	const output: string[] = [];
 
 	const run = {
 		enqueued: () => undefined,
 		started: () => undefined,
 		skipped: () => undefined,
-		errored: () => undefined,
 		appendOutput: (chunk: string) => {
 			output.push(chunk);
 		},
 		end: () => undefined,
+		errored: (test: vscode.TestItem, message: vscode.TestMessage | vscode.TestMessage[]) => {
+			const messages = Array.isArray(message) ? message : [message];
+			errored.push({
+				test,
+				messages: messages.map((msg) => {
+					if (typeof msg.message === "string") {
+						return msg.message;
+					}
+					return msg.message.value ?? "";
+				}),
+			});
+		},
 		failed: (test: vscode.TestItem, message: vscode.TestMessage | vscode.TestMessage[]) => {
 			const messages = Array.isArray(message) ? message : [message];
 			failed.push({
@@ -260,5 +319,5 @@ function createRunRecorder(): RunRecorder {
 		},
 	} as unknown as vscode.TestRun;
 
-	return { run, passed, failed, output };
+	return { run, passed, failed, errored, output };
 }

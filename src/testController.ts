@@ -451,9 +451,12 @@ export class RbxtsJestTestController {
         const hasSomePassing = summaryMatch && parseInt(summaryMatch[2]) > 0;
         const hasSomeFailures = summaryMatch && summaryMatch[1] && parseInt(summaryMatch[1]) > 0;
 
-        // Check if we have any test output at all - if the test runner failed before running tests
-        // (e.g., compilation error), there won't be a summary line
-        const hasTestOutput = summaryMatch !== null;
+        // Check if we have any test execution output at all - look for pass/fail markers or test suite headers
+        // If the test runner failed before running tests (e.g., compilation error), there won't be these markers
+        const hasPassMarkers = /(?:Γô|[✓✔√])/.test(cleanedOutput);
+        const hasFailMarkers = /(?:Γò|[✕✗×✘]|●)/.test(cleanedOutput);
+        const hasTestSuiteHeader = /(?:PASS|FAIL)\s+/.test(cleanedOutput);
+        const hasTestOutput = hasPassMarkers || hasFailMarkers || hasTestSuiteHeader;
 
         // If the command failed and there's no test output, it means the build/compilation failed
         if (!result.success && !hasTestOutput) {
